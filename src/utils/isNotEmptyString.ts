@@ -1,3 +1,3 @@
-export default function isNotEmptyString(hobbyName: any): hobbyName is string {
-    return typeof hobbyName === 'string' && hobbyName !== '';
+export default function isNotEmptyString(value: any): value is string {
+    return typeof value === 'string' && value !== '';
 }

@@ -4,7 +4,7 @@ export default (req: Express.Request, res: Express.Response, next: Express.NextF
     log('Cookies: ', req.cookies);
     log('Header: ', req.headers);
     log('Session id: ', req.sessionID);
-    log('Req:', req)
+    // log('Req:', req)
 
     next();
 }

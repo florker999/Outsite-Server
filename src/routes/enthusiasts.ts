@@ -2,11 +2,12 @@ import Express from "express";
 import ICreateEnthusiastRequest from "../models/ICreateEnthusiastRequest.js";
 import isNotEmptyString from "../utils/isNotEmptyString.js";
 import { Db } from "mongodb";
-import { AuthFlowType, CognitoIdentityProviderClient, ConfirmSignUpCommand, GetUserCommand, InitiateAuthCommand, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { AuthFlowType, CognitoIdentityProviderClient, ConfirmSignUpCommand, GetUserCommand, InitiateAuthCommand, ListUsersCommand, ResendConfirmationCodeCommand, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
 import crypto from 'node:crypto';
 import { IConfirmSignUpRequest } from "../models/IConfirmSignUpRequest.js";
 import ILoginResponse from "../models/ILoginResponse.js";
 import ISignupResponse from "../models/ISignupResponse.js";
+import AWS from "aws-sdk";
 
 export default function launchRoute(app: Express.Application, outsiteDb: Db) {
 
@@ -46,15 +47,56 @@ export default function launchRoute(app: Express.Application, outsiteDb: Db) {
         return;
     });
 
+    /*     app.get('/checkUsernameAvailability', async (req, res) => {
+            console.log("Entered CheckUsernameAvailability route, sid: " + req.sessionID);
+    
+            const { username } = req.query;
+            if (typeof username === 'string' && username) {
+                try {
+                    console.log("Checking username availability...");
+    
+                    const checkRes = await checkUsernameAvailability(username);
+                    if (checkRes.Users && checkRes.Users.length > 0) {
+                        console.log("Username unavailable.");
+                        res.send(false);
+                        res.status(200);
+                        res.end();
+                        return;
+    
+                    } else {
+                        console.log("Username available.");
+                        res.send(true);
+                        res.status(200);
+                        res.end();
+                        return;
+                    }
+                } catch (error) {
+                    console.log("Failed to check the availability: ", error);
+                    res.sendStatus(400);
+                    res.end();
+                    return;
+    
+                }
+            }
+        })
+     */
     app.post('/signUp', async (req, res) => {
-        console.log("Entered Signup route, sid: " + req.sessionID);
-        const { username, password, email }: ICreateEnthusiastRequest = req.body;
-        console.log(req.session, req.sessionID);
+        console.log("Entered SignUp route, sid: " + req.sessionID);
 
-        if (isNotEmptyString(username) && isNotEmptyString(password)) {
-            const clientId: string = "69jsmdkbec8dn150mi19r22nab";
+        const { email, username, password }: ICreateEnthusiastRequest = req.body;
+        const signUpDataAreValid = validateSignUpData(email, username, password);
 
-            console.log("Trying to signup.");
+        if (!signUpDataAreValid) {
+            res.status(404);
+            res.send("Wrong input data.");
+            return;
+
+        }
+
+        const clientId: string = "69jsmdkbec8dn150mi19r22nab";
+
+        try {
+            console.log("Trying to signup...");
             const signUpRes = await signUp({ clientId, username, password, email });
             console.log("Success!");
 
@@ -72,33 +114,76 @@ export default function launchRoute(app: Express.Application, outsiteDb: Db) {
                     }
                 }
                 console.log("Sending data back.");
-                res.status(200);
                 res.send(responseObject);
+                res.status(200);
                 res.end();
                 return;
             }
+
+        } catch (error) {
+            if (error instanceof Error) {
+                if (error.name === "UsernameExistsException") {
+                    console.log("Failed to sign up the user: username exists.");
+                    res.status(400);
+                    res.statusMessage = "UsernameExistsException";
+                    res.end();
+                    return;
+                }
+            }
+
+            console.log("Failed to sign up the user: ", error);
+            res.sendStatus(400);
+            res.end();
+            return;
         }
-        res.status(404);
-        res.send("Wrong input data.");
-        return;
     });
 
     app.post('/confirmSignUp', async (req, res) => {
         const { code, session, username }: IConfirmSignUpRequest = req.body;
         const clientId: string = "69jsmdkbec8dn150mi19r22nab";
-        console.log(req.session, req.sessionID);
 
         try {
-            const signUpRes = await confirmSignUp({ clientId, session, code, username });
-            const loginRes = await initiateAuth({ clientId, session: signUpRes.Session, username, password: '' });
-
+            console.log("Trying to confirm signup...");
+            await confirmSignUp({ clientId, session, code, username });
+            console.log("Success!");
+            
+            console.log("Sending data back.");
             res.status(200);
             res.end();
             return;
 
         } catch (error) {
-            console.error(error);
-            res.sendStatus(500);
+            console.error("Failed to confirm signup: ", error);
+            if (error instanceof Error) {
+                res.statusMessage = error.name;
+            }
+            res.sendStatus(400);
+            res.end();
+            return;
+        }
+    });
+
+    app.post('/resendCode', async (req, res) => {
+        const { username }: IConfirmSignUpRequest = req.body;
+        const clientId: string = "69jsmdkbec8dn150mi19r22nab";
+
+        try {
+            console.log("Trying to resend code...");
+            await resendCode({ clientId, username });
+            console.log("Success!");
+            
+            console.log("Sending data back.");
+            res.status(200);
+            res.end();
+            return;
+
+        } catch (error) {
+            console.error("Failed to resend code: ", error);
+            if (error instanceof Error) {
+                res.statusMessage = error.name;
+            }
+            res.sendStatus(400);
+            res.end();
             return;
         }
     });
@@ -132,6 +217,19 @@ export default function launchRoute(app: Express.Application, outsiteDb: Db) {
         return client.send(command);
     };
 
+    /*     const checkUsernameAvailability = (username: string) => {
+            const client = new CognitoIdentityProviderClient({ region: "eu-north-1" });
+            const command = new ListUsersCommand({
+                UserPoolId: "eu-north-1_bxXBLQOlb",
+                AttributesToGet: ['username'],
+                Limit: 1,
+                Filter: `username = ${username}`
+            });
+    
+            return client.send(command);
+        };
+     */
+
     const confirmSignUp = ({ clientId, username, session, code }: { clientId: string, username: string, session: string, code: string }) => {
         const client = new CognitoIdentityProviderClient({ region: "eu-north-1" });
 
@@ -146,18 +244,32 @@ export default function launchRoute(app: Express.Application, outsiteDb: Db) {
         return client.send(command);
     };
 
-    const signUp = ({ clientId, username, password, email }: { clientId: string, username: string, password: string, email: string }) => {
+    const resendCode = ({ clientId, username }: { clientId: string, username: string }) => {
         const client = new CognitoIdentityProviderClient({ region: "eu-north-1" });
 
-        const command = new SignUpCommand({
+        const command = new ResendConfirmationCodeCommand({
             ClientId: clientId,
             Username: username,
-            Password: password,
-            UserAttributes: [{ Name: "email", Value: email }, { Name: 'nickname', Value: username }],
             SecretHash: generateHmacBase64("8ppn74d2qjr3jedu7k4atc8cb3kgv51q8sjktis2r1s5veh6eoe", username, clientId)
         });
 
         return client.send(command);
+    };
+
+    const signUp = async ({ clientId, username, password, email }: { clientId: string, username: string, password: string, email: string }) => {
+        const client = new CognitoIdentityProviderClient({ region: "eu-north-1" });
+        const command = new SignUpCommand({
+            SecretHash: generateHmacBase64("8ppn74d2qjr3jedu7k4atc8cb3kgv51q8sjktis2r1s5veh6eoe", username, clientId),
+            ClientId: clientId,
+            Username: username,
+            Password: password,
+            UserAttributes: [
+                { Name: "email", Value: email },
+                { Name: 'nickname', Value: username }
+            ],
+        });
+
+        return await client.send(command);
     };
 
     const getUser = (accessToken: string) => {
@@ -211,4 +323,12 @@ export default function launchRoute(app: Express.Application, outsiteDb: Db) {
         }
     });
     */
+}
+
+function validateSignUpData(email: string, username: string, password: string) {
+    return (
+        isNotEmptyString(email)
+        && isNotEmptyString(username)
+        && isNotEmptyString(password)
+    );
 }
