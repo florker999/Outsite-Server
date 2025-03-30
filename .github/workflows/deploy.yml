@@ -59,7 +59,7 @@ jobs:
 
             # Example for Node.js: Install dependencies and restart app with PM2
             npm install --production # Install only production dependencies
-            tsc
+            npx tsc
 
             pm2 stop my-app || true
             pm2 delete my-app || true
