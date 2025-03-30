@@ -59,11 +59,10 @@ jobs:
 
             # Example for Node.js: Install dependencies and restart app with PM2
             npm install # Install only production dependencies
-            npx tsc
 
             pm2 stop my-app || true
             pm2 delete my-app || true
-            pm2 start npm --name my-app -- start
+            pm2 start npx --name my-app -- tsx ./src/index.ts
             pm2 save
 
             # Example for Python/Django/Flask: Install dependencies, run migrations, restart gunicorn/uvicorn
