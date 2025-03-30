@@ -1,0 +1,80 @@
+# .github/workflows/deploy.yml
+
+name: Deploy to EC2
+
+# Trigger the workflow on push events to the main branch
+on:
+  push:
+    branches:
+      - main  # Or your deployment branch (e.g., master, prod)
+
+jobs:
+  # ---- Optional: CI Job (Build & Test) ----
+  build-and-test:
+    runs-on: ubuntu-latest # Use a standard runner environment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Action to get your code
+
+      # --- Add your build steps here (if needed) ---
+      # Example for Node.js:
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '20' # Specify your Node.js version
+      # - name: Install dependencies
+      #   run: npm ci # Use ci for cleaner installs in CI/CD
+      # - name: Run build command (if any)
+      #   run: npm run build --if-present
+
+      # --- Add your test steps here ---
+      # Example for Node.js:
+      # - name: Run tests
+      #   run: npm test
+
+  # ---- Deployment Job ----
+  deploy:
+    needs: build-and-test # Make sure build-and-test job succeeds first (remove if you don't have that job)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 instance via SSH
+        uses: appleboy/ssh-action@master # Popular action for SSH commands
+        with:
+          host: ${{ secrets.SSH_HOST }}         # EC2 Instance IP/DNS
+          username: ${{ secrets.SSH_USER }}     # EC2 Instance User
+          key: ${{ secrets.SSH_PRIVATE_KEY }}   # Private SSH Key
+          script: | # Commands to run on EC2
+            # Navigate to the app directory
+            cd ${{ secrets.DEPLOY_PATH }} || exit 1 # Use secret or hardcode path e.g., /var/www/myapp
+
+            # Pull the latest changes from the main branch
+            git checkout main # Ensure you're on the correct branch
+            git pull origin main
+
+            # --- Add commands specific to your application ---
+            echo "Running deployment commands..."
+
+            # Example for Node.js: Install dependencies and restart app with PM2
+            npm install --production # Install only production dependencies
+            tsc
+
+            pm2 stop my-app || true
+            pm2 delete my-app || true
+            pm2 start npm --name my-app -- start
+            pm2 save
+
+            # Example for Python/Django/Flask: Install dependencies, run migrations, restart gunicorn/uvicorn
+            # pip install -r requirements.txt
+            # python manage.py migrate
+            # sudo systemctl restart gunicorn # Or supervisorctl restart myapp
+
+            # Example for Static Site (Nginx/Apache): No extra commands usually needed after git pull
+            # (Ensure web server points to this directory)
+
+            # Example: Restarting a service
+            # sudo systemctl restart my-app.service
+
+            echo "Deployment finished!"
