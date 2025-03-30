@@ -194,7 +194,7 @@ export default function launchRoute(app: Express.Application, outsiteDb: Db) {
         let command;
         if (session) {
             command = new InitiateAuthCommand({
-                AuthFlow: AuthFlowType.USER_SRP_AUTH,
+                AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
                 AuthParameters: {
                     USERNAME: username,
                     SECRET_HASH: generateHmacBase64("8ppn74d2qjr3jedu7k4atc8cb3kgv51q8sjktis2r1s5veh6eoe", username, clientId)
