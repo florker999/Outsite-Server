@@ -48,7 +48,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}   # Private SSH Key
           script: | # Commands to run on EC2
             # Navigate to the app directory
-            cd ${{ secrets.DEPLOY_PATH }} || exit 1 # Use secret or hardcode path e.g., /var/www/myapp
+            cd ./Outsite-Server || exit 1 # Use secret or hardcode path e.g., /var/www/myapp
 
             # Pull the latest changes from the main branch
             git checkout main # Ensure you're on the correct branch
