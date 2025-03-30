@@ -28,11 +28,10 @@ const outsiteDb = client.db(dbName);
 
 const port: number = 3001;
 
-let cognitoClient: BaseClient;
 // Initialize OpenID Client
 async function initializeClient() {
     const issuer = await Issuer.discover('https://cognito-idp.eu-north-1.amazonaws.com/eu-north-1_bxXBLQOlb');
-    cognitoClient = new issuer.Client({
+    new issuer.Client({
         client_id: '69jsmdkbec8dn150mi19r22nab',
         client_secret: '<client secret>',
         redirect_uris: ['https://d84l1y8p4kdic.cloudfront.net'],
